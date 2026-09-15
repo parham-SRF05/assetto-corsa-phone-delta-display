@@ -1,0 +1,302 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<title>AC Dash</title>
+<style>
+  :root {
+    --text: #f2f2f2; --muted: #8a8a8a; --panel: #121212; --off: #1b1b1b;
+    --purple: #b45cff; --purple-bg: #2c1245;
+    --green: #2ee66b; --green-bg: #0b3a1c;
+    --yellow: #ffcc1a; --yellow-bg: #3a3000;
+    --red: #ff3b3b; --ers: #2fd3ff;
+    --led-green: #22e05a; --led-red: #ff2a2a; --led-blue: #3d6bff;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  [hidden] { display: none !important; }
+  html, body {
+    height: 100%; background: #000; color: var(--text); overflow: hidden;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent;
+  }
+  body {
+    display: grid; grid-template-rows: auto 1fr auto auto; gap: 2vh;
+    padding: max(2.2vh, env(safe-area-inset-top)) max(3vw, env(safe-area-inset-right))
+             max(2.2vh, env(safe-area-inset-bottom)) max(3vw, env(safe-area-inset-left));
+  }
+  .label { font-size: 2.5vh; letter-spacing: .14em; color: var(--muted); font-weight: 600; white-space: nowrap; }
+  .num { font-variant-numeric: tabular-nums; }
+
+  /* shift lights */
+  .lights { display: flex; justify-content: center; gap: 1.2vw; }
+  .led { width: 6.5vh; height: 6.5vh; border-radius: 50%; background: var(--off); }
+  .led.gap { margin-left: 2.4vw; }
+  .led.on.g { background: var(--led-green); box-shadow: 0 0 2.2vh var(--led-green); }
+  .led.on.r { background: var(--led-red); box-shadow: 0 0 2.2vh var(--led-red); }
+  .led.on.b { background: var(--led-blue); box-shadow: 0 0 2.2vh var(--led-blue); }
+  .lights.flash .led { animation: flash .16s steps(1, end) infinite; }
+  @keyframes flash {
+    0% { background: var(--led-blue); box-shadow: 0 0 2.6vh var(--led-blue); }
+    50% { background: var(--off); box-shadow: none; }
+  }
+
+  /* main row */
+  .main { display: grid; grid-template-columns: 1fr auto 1.3fr; gap: 3vw; align-items: center; min-height: 0; }
+  .big { font-size: 15vh; font-weight: 800; line-height: 1; }
+  .big small, .mid small { font-size: 5vh; color: var(--muted); font-weight: 600; margin-left: .4vw; }
+  .mid { font-size: 10vh; font-weight: 800; line-height: 1; }
+  .space { margin-top: 2.5vh; }
+  .gear {
+    position: relative; width: 30vh; height: 40vh; display: flex; align-items: center; justify-content: center;
+    border: .5vh solid #2c2c2c; border-radius: 2.5vh; font-size: 36vh; font-weight: 800; line-height: 1;
+  }
+  .gear .mode { position: absolute; bottom: 1.2vh; font-size: 2.4vh; line-height: 1; }
+  .right { text-align: right; min-width: 0; }
+  .delta { font-size: 16vh; font-weight: 800; line-height: 1; }
+  .delta2 { font-size: 10vh; font-weight: 800; line-height: 1; }
+  .info { color: var(--text); letter-spacing: .06em; }
+  .tag { color: var(--red); font-weight: 800; margin-right: 1vw; }
+  .faster { color: var(--green); }
+  .slower { color: var(--red); }
+  .purple-text { color: var(--purple); }
+
+  /* sectors */
+  .sectors { position: relative; display: grid; grid-template-columns: repeat(var(--n, 3), 1fr); gap: 1.5vw; }
+  .sector { background: var(--panel); border: .4vh solid transparent; border-radius: 1.6vh; padding: 1.1vh 1vw 1.3vh; }
+  .sector .head { display: flex; justify-content: space-between; align-items: baseline; }
+  .sector .value { font-size: 6.5vh; font-weight: 700; line-height: 1.1; }
+  .sector.purple { background: var(--purple-bg); color: var(--purple); }
+  .sector.green { background: var(--green-bg); color: var(--green); }
+  .sector.yellow { background: var(--yellow-bg); color: var(--yellow); }
+  .sector.live { border-color: #4a4a4a; }
+  .sector.prev { opacity: .55; }
+  .minis { display: grid; grid-template-columns: repeat(8, 1fr); gap: .5vw; margin-top: 1vh; }
+  .minis i { height: 3vh; border-radius: .6vh; background: #262626; }
+  .minis i.purple { background: var(--purple); }
+  .minis i.green { background: var(--green); }
+  .minis i.yellow { background: var(--yellow); }
+  .minis i.live { background: #262626; box-shadow: inset 0 0 0 .4vh #e8e8e8; }
+  #note {
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    background: rgba(0, 0, 0, .75); color: #bbb; font-size: 3.4vh; font-weight: 600; border-radius: 1.6vh;
+    text-align: center; padding: 0 2vw;
+  }
+
+  /* ERS */
+  .ers { display: flex; align-items: center; gap: 2vw; }
+  .bar { flex: 1; height: 5vh; background: #1c1c1c; border-radius: 1vh; overflow: hidden; }
+  .fill { height: 100%; width: 0; background: var(--ers); }
+  .pct { font-size: 5.5vh; font-weight: 700; min-width: 4.5ch; text-align: right; }
+
+  #overlay {
+    position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+    background: rgba(0, 0, 0, .88); color: #bbb; font-size: 6vh; font-weight: 700;
+    text-align: center; padding: 5vw;
+  }
+  #hint { position: fixed; bottom: .5vh; left: 0; right: 0; text-align: center; font-size: 2vh; color: #444; }
+</style>
+</head>
+<body>
+  <div class="lights" id="lights"></div>
+
+  <div class="main">
+    <div>
+      <div class="label">POSITION</div>
+      <div class="big num"><span id="pos">P–</span><small id="cars"></small></div>
+      <div class="label space" id="lapsLabel">LAPS LEFT</div>
+      <div class="mid num"><span id="lapsValue">–</span><small id="lapsSub"></small></div>
+    </div>
+
+    <div class="gear num"><span id="gear">N</span><span class="label mode" id="gearbox"></span></div>
+
+    <div class="right">
+      <div class="label"><span class="tag" id="invalid" hidden>LAP INVALID</span>vs YOUR BEST <span class="info num" id="bestTime"></span></div>
+      <div class="delta num" id="deltaBest">--.---</div>
+      <div class="label space">vs FASTEST <span class="info num" id="fastestInfo"></span></div>
+      <div class="delta2 num" id="deltaFastest">--.---</div>
+    </div>
+  </div>
+
+  <div class="sectors" id="sectors"><div id="note" hidden>Sector splits are being learned: they appear as you pass them on this first lap</div></div>
+
+  <div class="ers">
+    <div class="label">ERS</div>
+    <div class="bar"><div class="fill" id="ersFill"></div></div>
+    <div class="pct num" id="ersPct">–</div>
+  </div>
+
+  <div id="overlay">Connecting…</div>
+  <div id="hint"></div>
+
+<script>
+  const $ = id => document.getElementById(id);
+  const LEDS = 15;
+  let lastMessage = Date.now();
+  let lastConnect = 0;
+  let events = null;
+
+  // Only touch the page when something changed (updates arrive 30 times a second).
+  function setText(el, text) { if (el.textContent !== text) el.textContent = text; }
+  function setClass(el, cls) { if (el.className !== cls) el.className = cls; }
+
+  // Negative = ahead.
+  function fmtDelta(ms) { return (ms <= 0 ? '−' : '+') + (Math.abs(ms) / 1000).toFixed(3); }
+  function fmtSector(ms) { return (ms / 1000).toFixed(3); }
+
+  const lights = $('lights');
+  for (let i = 0; i < LEDS; i++) {
+    const led = document.createElement('div');
+    led.className = 'led';
+    led.dataset.color = i < 5 ? 'g' : i < 10 ? 'r' : 'b';
+    lights.appendChild(led);
+  }
+
+  function renderLights(d) {
+    const s = d.shift;
+    let lit = 0, flash = false;
+    if (s) {
+      if (s.flash && d.rpm >= s.at) flash = true;
+      else if (d.rpm > s.from) lit = Math.min(LEDS, Math.ceil((d.rpm - s.from) / (s.at - s.from) * LEDS));
+    }
+    setClass(lights, flash ? 'lights flash' : 'lights');
+    [...lights.children].forEach((led, i) => {
+      const gap = (i === 5 || i === 10) ? ' gap' : '';
+      setClass(led, 'led ' + led.dataset.color + gap + (!flash && i < lit ? ' on' : ''));
+    });
+  }
+
+  function setOverlay(text) {
+    const el = $('overlay');
+    el.hidden = !text;
+    if (text) setText(el, text);
+  }
+
+  function renderSectors(list, ready) {
+    const box = $('sectors');
+    const cards = box.querySelectorAll('.sector');
+    if (cards.length !== list.length) {
+      cards.forEach(c => c.remove());
+      box.style.setProperty('--n', list.length);
+      list.forEach((_, i) => {
+        const card = document.createElement('div');
+        card.className = 'sector';
+        card.innerHTML = `<div class="head"><span class="label">S${i + 1}</span><span class="value num">···</span></div>` +
+          '<div class="minis">' + '<i></i>'.repeat(8) + '</div>';
+        box.insertBefore(card, $('note'));
+      });
+    }
+    $('note').hidden = ready;
+    box.querySelectorAll('.sector').forEach((card, i) => {
+      const s = list[i];
+      let text = '···';
+      if (s.delta !== null) text = fmtDelta(s.delta);
+      else if (s.time !== null) text = fmtSector(s.time);
+      else if (s.state === 'done') text = '—';  // passed before the dashboard could see it
+      setText(card.querySelector('.value'), text);
+      let cls = 'sector';
+      if (s.color) cls += ' ' + s.color;
+      if (s.state === 'live') cls += ' live';
+      if (s.prev) cls += ' prev';
+      setClass(card, cls);
+      card.querySelectorAll('.minis i').forEach((mini, j) => setClass(mini, s.minis[j] || ''));
+    });
+  }
+
+  function renderDelta(el, ms, fasterClass) {
+    if (ms === null) { setText(el, '--.---'); setClass(el, el.dataset.base); return; }
+    setText(el, fmtDelta(ms));
+    setClass(el, el.dataset.base + ' ' + (ms <= 0 ? fasterClass : 'slower'));
+  }
+  $('deltaBest').dataset.base = 'delta num';
+  $('deltaFastest').dataset.base = 'delta2 num';
+
+  function render(d) {
+    if (!d.live) { setOverlay(d.message || 'Waiting for Assetto Corsa'); return; }
+    setOverlay(d.paused ? 'PAUSED' : null);
+
+    setText($('pos'), 'P' + d.position);
+    setText($('cars'), d.cars > 0 ? '/' + d.cars : '');
+    setText($('lapsLabel'), d.lapsLabel);
+    setText($('lapsValue'), d.lapsValue);
+    setText($('lapsSub'), d.lapsSub);
+    setText($('gear'), d.gear);
+    setText($('gearbox'), d.gearbox);
+    renderLights(d);
+
+    $('invalid').hidden = !d.invalid;
+    setText($('bestTime'), d.bestTime || '');
+    renderDelta($('deltaBest'), d.deltaBest, 'faster');
+    const f = d.fastest;
+    setText($('fastestInfo'), f ? f.time + ' · ' + (f.you ? 'YOU' : f.driver) : '');
+    renderDelta($('deltaFastest'), d.deltaFastest, 'purple-text');
+
+    renderSectors(d.sectors, d.sectorsReady);
+
+    if (d.ers === null) {
+      $('ersFill').style.width = '0%';
+      setText($('ersPct'), '–');
+    } else {
+      const pct = Math.round(d.ers * 100);
+      $('ersFill').style.width = pct + '%';
+      setText($('ersPct'), pct + '%');
+    }
+  }
+
+  // Live data from the PC. Reconnects by itself after Wi-Fi drops or the screen was off.
+  function connect() {
+    if (events) events.close();
+    lastConnect = Date.now();
+    events = new EventSource('/events');
+    events.onmessage = e => {
+      lastMessage = Date.now();
+      try { render(JSON.parse(e.data)); } catch (err) { console.error(err); }
+    };
+  }
+  connect();
+  setInterval(() => {
+    const silent = Date.now() - lastMessage;
+    if (silent > 2500) setOverlay('No connection to PC');
+    if ((silent > 5000 || events.readyState === EventSource.CLOSED) && Date.now() - lastConnect > 5000) connect();
+  }, 500);
+
+  // Keep the screen on. Browsers only allow this on secure pages, so on plain Wi-Fi it may not be
+  // available: then the phone's own "Stay awake" setting is needed (the hint says so).
+  const canWake = 'wakeLock' in navigator && window.isSecureContext;
+  let wakeLock = null;
+  async function keepAwake() {
+    if (!canWake || wakeLock || document.visibilityState !== 'visible') return;
+    try {
+      wakeLock = await navigator.wakeLock.request('screen');
+      wakeLock.addEventListener('release', () => { wakeLock = null; });
+    } catch (err) { wakeLock = null; }
+  }
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState !== 'visible') return;
+    keepAwake();
+    if (Date.now() - lastMessage > 1500) connect();
+  });
+  keepAwake();
+
+  function updateHint() {
+    const parts = [];
+    if (!document.fullscreenElement) parts.push('tap for full screen');
+    if (!canWake) parts.push('screen can turn off: use the phone\'s "Stay awake" setting');
+    setText($('hint'), parts.join('  ·  '));
+  }
+  updateHint();
+
+  document.addEventListener('click', () => {
+    keepAwake();
+    const root = document.documentElement;
+    if (!document.fullscreenElement && root.requestFullscreen) {
+      root.requestFullscreen()
+        .then(() => screen.orientation && screen.orientation.lock && screen.orientation.lock('landscape'))
+        .catch(() => {});
+    }
+  });
+  document.addEventListener('fullscreenchange', updateHint);
+</script>
+</body>
+</html>

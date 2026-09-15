@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+
+# created while the dashboard runs
+cache/
+dashboard.log
+dashboard.log.old
