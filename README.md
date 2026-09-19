@@ -183,14 +183,53 @@ python tests/test_shift_lights.py
 
 ## Pit calls
 
-The dashboard can run your race strategy and call you in. **Set it up on the phone:** tap the pit strip at the bottom of the dashboard, or open
-`http://<your-pc>:8765/strategy`. You get a page where you set the race distance, add or remove
-stops, pick the tyre for each stint, and choose how early the warning comes. The tyre buttons show
-the compounds of the car you are actually driving, read from its own `tyres.ini` — all five of them
-on an F1 mod, not a generic soft/medium/hard guess. A bar across the top draws the plan as you
-change it, and saving takes effect immediately: no restart, even mid-session.
+The dashboard can run your race strategy and call you into the pits.
 
-Behind that page the plan lives in `strategy.json`, so you can still edit it by hand:
+### Planning the race on your phone
+
+Tap the **pit strip** along the bottom of the dashboard, or open `http://<your-pc>:8765/strategy`
+in any browser on the same Wi-Fi.
+
+| On the page | What it does |
+|---|---|
+| **Laps** | The race distance, with a stepper you can hit with a thumb. It tells you what you have built: *"2 stops, 3 stints"* |
+| **The plan** | A bar drawn in tyre colours, with `BOX 24` markers under it. It redraws as you edit, so you see the shape of the race before you drive it |
+| **A card per stint** | Pick the tyre from the chips, set the lap you come in at the end of. The final card says *"Runs to the flag"* instead of asking for a lap, because it cannot have a stop |
+| **+ Add a stop** | Splits the remaining distance in half and gives you a sensible lap number, rather than a blank to fill in |
+| **Remove** | Drops a stint; the remaining stops keep their order |
+| **Tell me early** | How many laps before the stop the warning appears (0–5) |
+| **Save plan** | Applies immediately — no restart, even in the middle of a session |
+
+**The tyre buttons are your car's own tyres.** They come from the car's `tyres.ini`, so an F1 mod
+with five compounds offers all five — `S`, `S1`, `M`, `M1`, `H` — with their real names, not a
+generic soft/medium/hard guess. Cars whose data cannot be read fall back to a generic list, so the
+picker is never empty.
+
+**Mistakes get corrected, not rejected.** Put stop 2 before stop 1 and it reorders them and tells
+you why. Ask for a stop on lap 99 of a 10-lap race and it moves it to lap 9. You never hit a
+dead end with a red error and no way forward.
+
+### What you get on track
+
+In order, as the stop approaches:
+
+| | On the phone | Colour |
+|---|---|---|
+| Most of the race | `NEXT STOP L24 · 15 LAPS` | grey, easy to ignore |
+| One lap before | `BOX NEXT LAP · HARD` | amber |
+| The stop lap | **`BOX BOX BOX`** | flashing red |
+| In the pit lane | `FIT HARD · STOP 1 OF 3` | green |
+| After the last stop | `NO MORE STOPS · 12 LAPS TO THE FLAG` | grey |
+
+It sits between the sectors and the ERS bar, so it never covers your delta.
+
+**It follows the race, not a script.** Stops are counted from real pit entries, so boxing early,
+boxing late or taking a surprise extra stop all keep the next call pointing at the right tyre. Stay
+out past your window and it tells you how far: `3 LAPS LATE`.
+
+### The file behind it
+
+The page writes `strategy.json`, which you can also edit by hand:
 
 ```json
 {
@@ -208,13 +247,15 @@ Behind that page the plan lives in `strategy.json`, so you can still edit it by 
 ```
 
 `boxOnLap` is the lap you come in at the end of; the last stint has `null` because it runs to the
-flag. The plan only fires when `track` and `laps` match the race you are actually in, so an old
+flag. A plan only fires when its `track` and `laps` match the race you are actually in, so an old
 plan can never call you into the pits at the wrong circuit.
 
-On the phone you get, in order: the next stop sitting quietly at the bottom, **BOX NEXT LAP** in
-amber a lap before, **BOX BOX BOX** flashing red on the lap itself, and the tyre to fit while you
-are in the lane. Stops are counted from real pit entries, so boxing early, boxing late or taking an
-extra stop all keep the plan pointing at the right tyre.
+### Working out what the plan should be
 
-Measure the numbers behind a plan with `python race_engineer.py --laps 53`: it logs fuel and tyre
-wear per lap and prints how much fuel the race needs and how long each compound lasts.
+```bash
+python race_engineer.py --laps 53
+```
+
+Start it before you go out and drive. It prints one line per lap — lap time, litres burned, wear on
+each corner, hot pressures — and when you stop it with Ctrl+C it tells you how much fuel the race
+needs and how many laps each compound lasts. Those are the numbers a plan should be built on.
