@@ -1,0 +1,12 @@
+{
+  "name": "Silverstone 53 - soft start, hard middle, medium home",
+  "track": "silverstone",
+  "laps": 53,
+  "warnLapsBefore": 1,
+  "stints": [
+    { "compound": "SOFT", "boxOnLap": 7 },
+    { "compound": "HARD", "boxOnLap": 24 },
+    { "compound": "HARD", "boxOnLap": 41 },
+    { "compound": "MEDIUM", "boxOnLap": null }
+  ]
+}

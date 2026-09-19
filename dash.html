@@ -96,6 +96,26 @@
     text-align: center; padding: 5vw;
   }
   #hint { position: fixed; bottom: .5vh; left: 0; right: 0; text-align: center; font-size: 2vh; color: #444; }
+
+  /* The pit call. Quiet until it matters, impossible to miss when it does. */
+  .pit { display: flex; text-decoration: none; align-items: center; justify-content: center; gap: 2.5vw;
+         padding: .9vh 2vw; margin-top: .6vh; border-radius: .8vh;
+         background: #111; border: .25vh solid #222; }
+  .pit .what { font-size: 3.4vh; font-weight: 700; letter-spacing: .06em; color: #8a8a8a; }
+  .pit .sub  { font-size: 2.2vh; letter-spacing: .08em; color: #555; }
+  .pit.warn { background: #2a1d00; border-color: #c88a00; }
+  .pit.warn .what { color: #ffc400; } .pit.warn .sub { color: #b98f11; }
+  .pit.pit-in { background: #001f1a; border-color: #00b894; }
+  .pit.pit-in .what { color: #00e6b8; } .pit.pit-in .sub { color: #12a98a; }
+  .pit.box { background: #3a0000; border-color: #ff2a2a; }
+  .pit.box .what { color: #fff; font-size: 5.2vh; }
+  .pit.box .sub { color: #ffb3b3; }
+  .pit.box { animation: boxflash .7s steps(1, end) infinite; }
+  @keyframes boxflash {
+    0%, 49%   { background: #c40000; border-color: #ff5a5a; }
+    50%, 100% { background: #2a0000; border-color: #8a0000; }
+  }
+  @media (prefers-reduced-motion: reduce) { .pit.box { animation: none; background: #c40000; } }
 </style>
 </head>
 <body>
@@ -120,6 +140,8 @@
   </div>
 
   <div class="sectors" id="sectors"><div id="note" hidden>Sector splits are being learned: they appear as you pass them on this first lap</div></div>
+
+  <a class="pit" id="pit" href="/strategy" hidden><span class="what" id="pitWhat"></span><span class="sub" id="pitSub"></span></a>
 
   <div class="ers">
     <div class="label">ERS</div>
@@ -204,6 +226,19 @@
     });
   }
 
+  // states: box (come in now), warn (one more lap), pit-in (in the lane), info (just the plan)
+  function renderPit(pit) {
+    const el = $('pit');
+    if (!pit) { el.hidden = true; return; }
+    el.hidden = false;
+    const cls = pit.state === 'box' ? 'pit box'
+              : pit.state === 'warn' ? 'pit warn'
+              : pit.state === 'pit' ? 'pit pit-in' : 'pit';
+    setClass(el, cls);
+    setText($('pitWhat'), pit.text || '');
+    setText($('pitSub'), pit.sub || '');
+  }
+
   function renderDelta(el, ms, fasterClass) {
     if (ms === null) { setText(el, '--.---'); setClass(el, el.dataset.base); return; }
     setText(el, fmtDelta(ms));
@@ -233,6 +268,8 @@
     renderDelta($('deltaFastest'), d.deltaFastest, 'purple-text');
 
     renderSectors(d.sectors, d.sectorsReady);
+
+    renderPit(d.pit);
 
     if (d.ers === null) {
       $('ersFill').style.width = '0%';

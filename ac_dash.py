@@ -24,6 +24,7 @@ import time
 import traceback
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
+import strategy as strategy_module
 from carinfo import CarProfiles
 from timing import Timing
 
@@ -476,7 +477,7 @@ def fmt_lap(ms):
     return '%d:%02d.%03d' % (ms // 60000, ms // 1000 % 60, ms % 1000)
 
 
-def build_view(p, g, s, app, timing, shift, auto, now):
+def build_view(p, g, s, app, timing, shift, auto, now, engineer=None):
     cars = app.cars
     present = [c for c in cars if c.connected]
     position = g.position
@@ -519,6 +520,14 @@ def build_view(p, g, s, app, timing, shift, auto, now):
 
     charge = p.kersCharge
     view['ers'] = max(0.0, min(1.0, charge)) if math.isfinite(charge) and charge > 0 else None
+
+    # The pit call, when a plan is loaded and it is for this track and distance.
+    view['pit'] = None
+    if engineer is not None and g.session == AC_RACE:
+        track_id = app.track + ('|' + app.layout if app.layout else '')
+        if engineer.plan and engineer.plan.fits(track_id, g.numberOfLaps):
+            engineer.update(g.completedLaps, bool(g.isInPit))
+            view['pit'] = engineer.call(g.completedLaps, bool(g.isInPit), g.numberOfLaps)
     return view
 
 
@@ -545,19 +554,81 @@ class State:
         return data
 
 
-def make_handler(state):
+class Strategy:
+    """The plan, shared between the reader loop and the settings page."""
+
+    def __init__(self):
+        self.lock = threading.Lock()
+        self.engineer = strategy_module.Engineer(strategy_module.load())
+        self.car = self.track = self.ac_root = ''
+        self.race_laps = 0
+
+    def seen(self, car, track, ac_root, race_laps):
+        with self.lock:
+            self.car, self.track, self.ac_root = car or '', track or '', ac_root or ''
+            if race_laps:
+                self.race_laps = race_laps
+
+    def as_json(self):
+        with self.lock:
+            plan, car, track, root, laps = (self.engineer.plan, self.car, self.track,
+                                            self.ac_root, self.race_laps)
+        stints = [{'compound': x['compound'], 'boxOnLap': x['box']} for x in plan.stints] if plan else []
+        return {
+            'plan': {'name': plan.name if plan else '', 'track': plan.track if plan else '',
+                     'laps': plan.laps if plan else (laps or 0),
+                     'warnLapsBefore': plan.warn_before if plan else strategy_module.DEFAULT_WARN_BEFORE,
+                     'stints': stints},
+            'compounds': strategy_module.compounds_for(root, car),
+            'car': car, 'track': track, 'raceLaps': laps,
+        }
+
+    def replace(self, data):
+        plan, problems = strategy_module.save(data)
+        with self.lock:
+            self.engineer.set_plan(plan)
+        log(f'Pit plan saved: {plan.laps} laps, stops on ' +
+            (', '.join(str(x) for x in plan.stops) or 'no stops'))
+        return problems
+
+
+def make_handler(state, strategy_store):
     class Handler(BaseHTTPRequestHandler):
+        def _send(self, body, kind='text/html; charset=utf-8', code=200):
+            self.send_response(code)
+            self.send_header('Content-Type', kind)
+            self.send_header('Content-Length', str(len(body)))
+            self.send_header('Cache-Control', 'no-store')
+            self.end_headers()
+            self.wfile.write(body)
+
+        def do_POST(self):
+            if self.path.split('?')[0] != '/api/strategy':
+                self.send_error(404)
+                return
+            try:
+                length = min(int(self.headers.get('Content-Length') or 0), 64 * 1024)
+                data = json.loads(self.rfile.read(length).decode('utf-8'))
+                problems = strategy_store.replace(data)
+                body = json.dumps({'ok': True, 'problems': problems,
+                                   'saved': strategy_store.as_json()}).encode()
+            except (ValueError, TypeError, OSError) as e:
+                body = json.dumps({'ok': False, 'problems': [f'Could not save: {e}']}).encode()
+            self._send(body, 'application/json; charset=utf-8')
+
         def do_GET(self):
             path = self.path.split('?')[0]
             if path in ('/', '/index.html'):
                 with open(os.path.join(HERE, 'dash.html'), 'rb') as f:
                     body = f.read()
-                self.send_response(200)
-                self.send_header('Content-Type', 'text/html; charset=utf-8')
-                self.send_header('Content-Length', str(len(body)))
-                self.send_header('Cache-Control', 'no-store')
-                self.end_headers()
-                self.wfile.write(body)
+                self._send(body)
+            elif path in ('/strategy', '/strategy.html'):
+                with open(os.path.join(HERE, 'strategy.html'), 'rb') as f:
+                    body = f.read()
+                self._send(body)
+            elif path == '/api/strategy':
+                self._send(json.dumps(strategy_store.as_json()).encode(),
+                           'application/json; charset=utf-8')
             elif path == '/events':
                 self.send_response(200)
                 self.send_header('Content-Type', 'text/event-stream')
@@ -582,8 +653,15 @@ def make_handler(state):
     return Handler
 
 
-def reader_loop(source, state, timing, debug):
+def reader_loop(source, state, timing, debug, strategy_store):
     lights = ShiftLights()
+    engineer = strategy_store.engineer
+    plan = engineer.plan
+    if plan:
+        log(f'Pit plan: {plan.name or "unnamed"} - stops on laps ' +
+            ', '.join(str(x) for x in plan.stops))
+    else:
+        log('No pit plan yet: open the dashboard and tap the pit strip to make one')
     status = session = gearbox = None
     last_print = last_error_time = 0.0
     last_error = None
@@ -621,6 +699,7 @@ def reader_loop(source, state, timing, debug):
 
             n = s.sectorCount if 1 <= s.sectorCount <= 10 else 3
             track_id = app.track + ('|' + app.layout if app.layout else '')
+            strategy_store.seen(s.carModel, track_id, app.root, g.numberOfLaps)
             key = (s.carModel, track_id, g.session)
             timing.update(now, key, track_id, n, app.cars, g.currentSectorIndex)
             if key != session:
@@ -637,7 +716,8 @@ def reader_loop(source, state, timing, debug):
                     + ('' if flag in (0, 1) else f' (unexpected gearbox value {flag}, treated as manual)'))
             profile = source.profile(app, s.carModel)
             lights.update(s.carModel, p, now, auto, profile)
-            view = build_view(p, g, s, app, timing, lights.target(p.gear - 1, auto, profile), auto, now)
+            view = build_view(p, g, s, app, timing, lights.target(p.gear - 1, auto, profile), auto, now,
+                              engineer)
             state.set(view)
 
             if now - last_print >= (1.0 if debug else 0.5):
@@ -701,8 +781,9 @@ def main():
     args = parser.parse_args()
 
     state = State()
+    strategy_store = Strategy()
     try:
-        server = ThreadingHTTPServer(('0.0.0.0', args.port), make_handler(state))
+        server = ThreadingHTTPServer(('0.0.0.0', args.port), make_handler(state, strategy_store))
     except OSError as e:
         print(f'Could not start on port {args.port}: {e}')
         print('Is the dashboard already open in another window?')
@@ -727,7 +808,7 @@ def main():
         + ', '.join(f'http://{ip}:{args.port}' for ip in addresses))
     source = DemoSource() if args.demo else LiveSource()
     timing = Timing(None if args.demo else os.path.join(CACHE_DIR, 'tracks.json'))
-    threading.Thread(target=reader_loop, args=(source, state, timing, args.debug), daemon=True).start()
+    threading.Thread(target=reader_loop, args=(source, state, timing, args.debug, strategy_store), daemon=True).start()
     try:
         server.serve_forever()
     except KeyboardInterrupt:

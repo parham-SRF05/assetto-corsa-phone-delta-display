@@ -180,3 +180,41 @@ python tests/test_shift_lights.py
 - **Windows only**, because Assetto Corsa's shared memory is a Windows feature.
 - **Sector split positions** are learned from your car's sector changes. They're saved per track in `cache/tracks.json`; delete that file to make them learn again.
 - **Automatic gearbox detection** uses Assetto Corsa's `autoShifterOn` flag. The dashboard window and `dashboard.log` show which mode it found.
+
+## Pit calls
+
+The dashboard can run your race strategy and call you in. **Set it up on the phone:** tap the pit strip at the bottom of the dashboard, or open
+`http://<your-pc>:8765/strategy`. You get a page where you set the race distance, add or remove
+stops, pick the tyre for each stint, and choose how early the warning comes. The tyre buttons show
+the compounds of the car you are actually driving, read from its own `tyres.ini` — all five of them
+on an F1 mod, not a generic soft/medium/hard guess. A bar across the top draws the plan as you
+change it, and saving takes effect immediately: no restart, even mid-session.
+
+Behind that page the plan lives in `strategy.json`, so you can still edit it by hand:
+
+```json
+{
+  "name": "Silverstone 53 - soft start, hard middle, medium home",
+  "track": "silverstone",
+  "laps": 53,
+  "warnLapsBefore": 1,
+  "stints": [
+    { "compound": "SOFT",   "boxOnLap": 7  },
+    { "compound": "HARD",   "boxOnLap": 24 },
+    { "compound": "HARD",   "boxOnLap": 41 },
+    { "compound": "MEDIUM", "boxOnLap": null }
+  ]
+}
+```
+
+`boxOnLap` is the lap you come in at the end of; the last stint has `null` because it runs to the
+flag. The plan only fires when `track` and `laps` match the race you are actually in, so an old
+plan can never call you into the pits at the wrong circuit.
+
+On the phone you get, in order: the next stop sitting quietly at the bottom, **BOX NEXT LAP** in
+amber a lap before, **BOX BOX BOX** flashing red on the lap itself, and the tyre to fit while you
+are in the lane. Stops are counted from real pit entries, so boxing early, boxing late or taking an
+extra stop all keep the plan pointing at the right tyre.
+
+Measure the numbers behind a plan with `python race_engineer.py --laps 53`: it logs fuel and tyre
+wear per lap and prints how much fuel the race needs and how long each compound lasts.

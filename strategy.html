@@ -1,0 +1,373 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Race strategy</title>
+<style>
+  :root {
+    --bg: #0a0c0f; --card: #14181d; --card-2: #1c222a; --line: #2b333d;
+    --ink: #eef3f6; --dim: #8b98a5; --faint: #5d6a77;
+    --accent: #00d2be; --danger: #ff4b4b; --warn: #ffb020;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 16px/1.5 -apple-system, "Segoe UI", Roboto, sans-serif;
+    padding: 20px 16px 120px; max-width: 620px; margin-inline: auto;
+  }
+  h1 { font-size: 26px; margin: 0 0 4px; letter-spacing: -.01em; }
+  .where { color: var(--dim); font-size: 14px; margin-bottom: 22px; }
+  .where b { color: var(--accent); font-weight: 600; }
+  h2 {
+    font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--faint);
+    margin: 26px 0 10px; font-weight: 700;
+  }
+
+  .row { background: var(--card); border-radius: 12px; padding: 14px 16px; display: flex;
+         align-items: center; justify-content: space-between; gap: 14px; }
+  .row .label { font-size: 15px; }
+  .row .hint { color: var(--faint); font-size: 13px; margin-top: 2px; }
+
+  /* a number you change with your thumb */
+  .stepper { display: flex; align-items: center; gap: 4px; flex: none; }
+  .stepper button {
+    width: 42px; height: 42px; border-radius: 10px; border: 1px solid var(--line);
+    background: var(--card-2); color: var(--ink); font-size: 22px; line-height: 1; cursor: pointer;
+  }
+  .stepper button:active { background: var(--accent); color: #04121a; border-color: var(--accent); }
+  .stepper input {
+    width: 68px; height: 42px; text-align: center; font-size: 19px; font-weight: 700;
+    background: transparent; color: var(--ink); border: none; font-variant-numeric: tabular-nums;
+  }
+  .stepper input:focus { outline: 2px solid var(--accent); border-radius: 8px; }
+
+  /* the stint list */
+  .stint { background: var(--card); border-radius: 12px; padding: 14px 16px; margin-bottom: 10px;
+           border-left: 4px solid var(--line); }
+  .stint header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+  .stint .no { font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--faint);
+               font-weight: 700; }
+  .stint .drop { background: none; border: none; color: var(--faint); font-size: 14px; cursor: pointer;
+                 padding: 4px 6px; }
+  .stint .drop:hover { color: var(--danger); }
+  .tyres { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+  .tyre {
+    border: 1px solid var(--line); background: var(--card-2); color: var(--dim);
+    border-radius: 999px; padding: 8px 15px; font-size: 14px; font-weight: 600; cursor: pointer;
+  }
+  .tyre .full { color: var(--faint); font-weight: 400; margin-left: 6px; font-size: 13px; }
+  .tyre[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #04121a; }
+  .tyre[aria-pressed="true"] .full { color: #04121a; opacity: .7; }
+  .boxline { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .boxline .label { font-size: 14px; color: var(--dim); }
+  .final { color: var(--accent); font-size: 14px; font-weight: 600; }
+
+  .add {
+    width: 100%; padding: 14px; border-radius: 12px; border: 1px dashed var(--line);
+    background: transparent; color: var(--accent); font-size: 15px; font-weight: 600; cursor: pointer;
+  }
+  .add:disabled { color: var(--faint); border-style: solid; cursor: default; }
+
+  /* live picture of the plan */
+  .bar { display: flex; height: 44px; border-radius: 8px; overflow: hidden; border: 1px solid var(--line); }
+  .seg { display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700;
+         color: #04121a; min-width: 0; }
+  .seg span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 0 4px; }
+  .marks { display: flex; margin-top: 6px; font-size: 12px; color: var(--faint);
+           font-variant-numeric: tabular-nums; }
+  .marks div { text-align: right; }
+  .marks b { color: var(--accent); font-weight: 600; }
+
+  .problems { background: #2a1111; border: 1px solid var(--danger); color: #ffc9c9;
+              border-radius: 10px; padding: 12px 14px; font-size: 14px; margin-top: 14px; }
+  .problems ul { margin: 6px 0 0; padding-left: 18px; }
+
+  .save {
+    position: fixed; left: 0; right: 0; bottom: 0; padding: 14px 16px calc(14px + env(safe-area-inset-bottom));
+    background: linear-gradient(to top, var(--bg) 70%, transparent);
+    display: flex; gap: 10px; max-width: 620px; margin-inline: auto;
+  }
+  .save button {
+    flex: 1; padding: 16px; border-radius: 12px; border: none; font-size: 16px; font-weight: 700;
+    background: var(--accent); color: #04121a; cursor: pointer;
+  }
+  .save a {
+    padding: 16px 18px; border-radius: 12px; border: 1px solid var(--line); color: var(--dim);
+    text-decoration: none; font-size: 15px; display: flex; align-items: center;
+  }
+  .toast {
+    position: fixed; left: 50%; transform: translateX(-50%); bottom: 90px; background: var(--accent);
+    color: #04121a; padding: 10px 18px; border-radius: 999px; font-weight: 700; font-size: 14px;
+    opacity: 0; transition: opacity .25s; pointer-events: none;
+  }
+  .toast.show { opacity: 1; }
+  @media (prefers-reduced-motion: reduce) { .toast { transition: none; } }
+</style>
+</head>
+<body>
+  <h1>Race strategy</h1>
+  <p class="where" id="where">Loading…</p>
+
+  <h2>Race distance</h2>
+  <div class="row">
+    <div>
+      <div class="label">Laps</div>
+      <div class="hint" id="lapsHint">How long the race is</div>
+    </div>
+    <div class="stepper">
+      <button type="button" id="lapsDown" aria-label="One lap fewer">−</button>
+      <input id="laps" type="number" inputmode="numeric" min="1" max="200" value="53">
+      <button type="button" id="lapsUp" aria-label="One lap more">+</button>
+    </div>
+  </div>
+
+  <h2>The plan</h2>
+  <div class="bar" id="bar"></div>
+  <div class="marks" id="marks"></div>
+
+  <h2 id="stintsHeading">Stints</h2>
+  <div id="stints"></div>
+  <button class="add" id="add" type="button">+ Add a stop</button>
+
+  <h2>Warning</h2>
+  <div class="row">
+    <div>
+      <div class="label">Tell me early</div>
+      <div class="hint">Laps before the stop that “BOX NEXT LAP” appears</div>
+    </div>
+    <div class="stepper">
+      <button type="button" id="warnDown" aria-label="Less warning">−</button>
+      <input id="warn" type="number" inputmode="numeric" min="0" max="5" value="1">
+      <button type="button" id="warnUp" aria-label="More warning">+</button>
+    </div>
+  </div>
+
+  <div id="problems"></div>
+
+  <div class="save">
+    <button type="button" id="saveBtn">Save plan</button>
+    <a href="/">Dashboard</a>
+  </div>
+  <div class="toast" id="toast"></div>
+
+<script>
+  const $ = id => document.getElementById(id);
+  const COLORS = { S: '#e8353a', S1: '#ff7a45', M: '#f5c518', M1: '#c9b037', H: '#dfe5e9',
+                   I: '#43b02a', W: '#0067ad' };
+  let compounds = [{ short: 'S', name: 'Soft' }, { short: 'M', name: 'Medium' }, { short: 'H', name: 'Hard' }];
+  let plan = { laps: 53, warnLapsBefore: 1, stints: [{ compound: 'MEDIUM', boxOnLap: null }], track: '', name: '' };
+
+  const colourOf = c => COLORS[(c || '').toUpperCase()] ||
+    COLORS[(compounds.find(x => x.name.toUpperCase() === (c || '').toUpperCase()) || {}).short] || '#8b98a5';
+
+  // --- drawing the page ------------------------------------------------------------------
+  function render() {
+    $('laps').value = plan.laps;
+    $('warn').value = plan.warnLapsBefore;
+    $('lapsHint').textContent = plan.stints.length === 1 ? 'No stops: one set of tyres all race'
+      : `${plan.stints.length - 1} stop${plan.stints.length > 2 ? 's' : ''}, ${plan.stints.length} stints`;
+    $('stintsHeading').textContent = plan.stints.length === 1 ? 'Stint' : 'Stints';
+    renderBar();
+    renderStints();
+    $('add').disabled = plan.stints.length >= 8;
+  }
+
+  function stintLaps() {
+    const out = [];
+    let from = 1;
+    plan.stints.forEach((s, i) => {
+      const to = i === plan.stints.length - 1 ? plan.laps : (s.boxOnLap || from);
+      out.push({ from, to, laps: Math.max(0, to - from + 1), compound: s.compound });
+      from = to + 1;
+    });
+    return out;
+  }
+
+  function renderBar() {
+    const rows = stintLaps();
+    $('bar').innerHTML = '';
+    $('marks').innerHTML = '';
+    rows.forEach((r, i) => {
+      const seg = document.createElement('div');
+      seg.className = 'seg';
+      seg.style.flex = Math.max(r.laps, 1);
+      seg.style.background = colourOf(r.compound);
+      seg.innerHTML = `<span>${r.laps} lap${r.laps === 1 ? '' : 's'}</span>`;
+      seg.title = `${r.compound}: laps ${r.from}–${r.to}`;
+      $('bar').appendChild(seg);
+
+      const mark = document.createElement('div');
+      mark.style.flex = Math.max(r.laps, 1);
+      mark.innerHTML = i === rows.length - 1 ? String(plan.laps) : `<b>BOX ${r.to}</b>`;
+      $('marks').appendChild(mark);
+    });
+  }
+
+  function renderStints() {
+    const host = $('stints');
+    host.innerHTML = '';
+    plan.stints.forEach((stint, i) => {
+      const last = i === plan.stints.length - 1;
+      const card = document.createElement('div');
+      card.className = 'stint';
+      card.style.borderLeftColor = colourOf(stint.compound);
+
+      const head = document.createElement('header');
+      head.innerHTML = `<span class="no">Stint ${i + 1}${last ? ' · to the flag' : ''}</span>`;
+      if (plan.stints.length > 1) {
+        const drop = document.createElement('button');
+        drop.className = 'drop';
+        drop.type = 'button';
+        drop.textContent = 'Remove';
+        drop.onclick = () => { plan.stints.splice(i, 1); fixLaps(); render(); };
+        head.appendChild(drop);
+      }
+      card.appendChild(head);
+
+      const tyres = document.createElement('div');
+      tyres.className = 'tyres';
+      compounds.forEach(c => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'tyre';
+        const chosen = (stint.compound || '').toUpperCase();
+        b.setAttribute('aria-pressed', chosen === c.name.toUpperCase() || chosen === c.short.toUpperCase());
+        b.innerHTML = `${c.short}<span class="full">${c.name}</span>`;
+        b.onclick = () => { stint.compound = c.name.toUpperCase(); render(); };
+        tyres.appendChild(b);
+      });
+      card.appendChild(tyres);
+
+      const line = document.createElement('div');
+      line.className = 'boxline';
+      if (last) {
+        line.innerHTML = `<span class="final">Runs to the flag — lap ${plan.laps}</span>`;
+      } else {
+        line.innerHTML = '<span class="label">Box at the end of lap</span>';
+        line.appendChild(stepper(stint.boxOnLap || 1, 1, plan.laps - 1, v => {
+          stint.boxOnLap = v; fixLaps(); render();
+        }));
+      }
+      card.appendChild(line);
+      host.appendChild(card);
+    });
+  }
+
+  function stepper(value, min, max, onChange) {
+    const wrap = document.createElement('div');
+    wrap.className = 'stepper';
+    const less = document.createElement('button');
+    less.type = 'button'; less.textContent = '−'; less.setAttribute('aria-label', 'Earlier lap');
+    const box = document.createElement('input');
+    box.type = 'number'; box.inputMode = 'numeric'; box.value = value; box.min = min; box.max = max;
+    const more = document.createElement('button');
+    more.type = 'button'; more.textContent = '+'; more.setAttribute('aria-label', 'Later lap');
+    less.onclick = () => onChange(Math.max(min, (parseInt(box.value, 10) || min) - 1));
+    more.onclick = () => onChange(Math.min(max, (parseInt(box.value, 10) || min) + 1));
+    box.onchange = () => onChange(Math.max(min, Math.min(max, parseInt(box.value, 10) || min)));
+    wrap.append(less, box, more);
+    return wrap;
+  }
+
+  /** Stops must stay in order and inside the race. */
+  function fixLaps() {
+    let previous = 0;
+    plan.stints.forEach((s, i) => {
+      if (i === plan.stints.length - 1) { s.boxOnLap = null; return; }
+      let lap = parseInt(s.boxOnLap, 10) || previous + 1;
+      lap = Math.min(Math.max(lap, previous + 1), plan.laps - 1);
+      s.boxOnLap = lap;
+      previous = lap;
+    });
+  }
+
+  // --- controls ---------------------------------------------------------------------------
+  function setLaps(v) {
+    plan.laps = Math.max(1, Math.min(200, v || 1));
+    fixLaps();
+    render();
+  }
+  $('lapsUp').onclick = () => setLaps(plan.laps + 1);
+  $('lapsDown').onclick = () => setLaps(plan.laps - 1);
+  $('laps').onchange = () => setLaps(parseInt($('laps').value, 10));
+  $('warnUp').onclick = () => { plan.warnLapsBefore = Math.min(5, plan.warnLapsBefore + 1); render(); };
+  $('warnDown').onclick = () => { plan.warnLapsBefore = Math.max(0, plan.warnLapsBefore - 1); render(); };
+  $('warn').onchange = () => {
+    plan.warnLapsBefore = Math.max(0, Math.min(5, parseInt($('warn').value, 10) || 0));
+    render();
+  };
+
+  $('add').onclick = () => {
+    const last = plan.stints[plan.stints.length - 1];
+    const previous = plan.stints.length > 1 ? plan.stints[plan.stints.length - 2].boxOnLap : 0;
+    const gap = Math.max(1, Math.round((plan.laps - previous) / 2));
+    last.boxOnLap = Math.min(previous + gap, plan.laps - 1);
+    plan.stints.push({ compound: last.compound, boxOnLap: null });
+    fixLaps();
+    render();
+  };
+
+  function toast(text, bad) {
+    const el = $('toast');
+    el.textContent = text;
+    el.style.background = bad ? 'var(--danger)' : 'var(--accent)';
+    el.style.color = bad ? '#fff' : '#04121a';
+    el.classList.add('show');
+    setTimeout(() => el.classList.remove('show'), 2200);
+  }
+
+  $('saveBtn').onclick = async () => {
+    fixLaps();
+    try {
+      const res = await fetch('/api/strategy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(plan),
+      });
+      const out = await res.json();
+      showProblems(out.problems || []);
+      if (out.ok && !(out.problems || []).length) toast('Plan saved');
+      else if (out.ok) toast('Saved with changes', true);
+      else toast('Could not save', true);
+      if (out.saved) { plan = out.saved.plan; render(); }
+    } catch (e) {
+      showProblems(['The dashboard is not reachable. Is it still running on the PC?']);
+      toast('Could not save', true);
+    }
+  };
+
+  function showProblems(list) {
+    $('problems').innerHTML = list.length
+      ? '<div class="problems"><b>Adjusted for you:</b><ul>' +
+        list.map(p => `<li>${p}</li>`).join('') + '</ul></div>'
+      : '';
+  }
+
+  // --- what the game is telling us --------------------------------------------------------
+  async function load() {
+    try {
+      const data = await (await fetch('/api/strategy')).json();
+      if (data.compounds && data.compounds.length) compounds = data.compounds;
+      if (data.plan && data.plan.stints && data.plan.stints.length) plan = data.plan;
+      if (!plan.laps && data.raceLaps) plan.laps = data.raceLaps;
+      plan.track = plan.track || data.track || '';
+      const car = data.car ? data.car.replace(/_/g, ' ') : '';
+      const bits = [];
+      if (car) bits.push(`<b>${car}</b>`);
+      if (data.track) bits.push(data.track.replace('|', ' · '));
+      if (data.raceLaps) bits.push(`${data.raceLaps} laps in the game`);
+      $('where').innerHTML = bits.length ? bits.join(' — ')
+        : 'Not in a session — the tyres below are a generic set until the game is running.';
+      fixLaps();
+      render();
+    } catch (e) {
+      $('where').textContent = 'Could not reach the dashboard. Is it running on the PC?';
+      render();
+    }
+  }
+
+  load();
+</script>
+</body>
+</html>

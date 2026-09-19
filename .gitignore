@@ -5,3 +5,4 @@ __pycache__/
 cache/
 dashboard.log
 dashboard.log.old
+logs/
