@@ -91,9 +91,15 @@
   .pct { font-size: 5.5vh; font-weight: 700; min-width: 4.5ch; text-align: right; }
 
   #overlay {
-    position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+    position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center;
+    justify-content: center; gap: 3vh;
     background: rgba(0, 0, 0, .88); color: #bbb; font-size: 6vh; font-weight: 700;
     text-align: center; padding: 5vw;
+  }
+  /* the way into the strategy page while the game is still loading */
+  #overlay a {
+    font-size: 2.6vh; font-weight: 600; letter-spacing: .08em; color: #00d2be;
+    text-decoration: none; border: .25vh solid #00d2be; border-radius: 1vh; padding: 1.2vh 3vw;
   }
   #hint { position: fixed; bottom: .5vh; left: 0; right: 0; text-align: center; font-size: 2vh; color: #444; }
 
@@ -110,6 +116,9 @@
   .pit.box { background: #3a0000; border-color: #ff2a2a; }
   .pit.box .what { color: #fff; font-size: 5.2vh; }
   .pit.box .sub { color: #ffb3b3; }
+  .pit.setup { background: #101418; border-style: dashed; }
+  .pit.setup .what { color: #6d7a86; font-size: 2.6vh; }
+  .pit.setup .sub { color: #4e5a64; }
   .pit.box { animation: boxflash .7s steps(1, end) infinite; }
   @keyframes boxflash {
     0%, 49%   { background: #c40000; border-color: #ff5a5a; }
@@ -149,7 +158,7 @@
     <div class="pct num" id="ersPct">–</div>
   </div>
 
-  <div id="overlay">Connecting…</div>
+  <div id="overlay"><span id="overlayText">Connecting…</span><a href="/strategy">RACE STRATEGY</a></div>
   <div id="hint"></div>
 
 <script>
@@ -192,7 +201,7 @@
   function setOverlay(text) {
     const el = $('overlay');
     el.hidden = !text;
-    if (text) setText(el, text);
+    if (text) setText($('overlayText'), text);
   }
 
   function renderSectors(list, ready) {
@@ -233,7 +242,8 @@
     el.hidden = false;
     const cls = pit.state === 'box' ? 'pit box'
               : pit.state === 'warn' ? 'pit warn'
-              : pit.state === 'pit' ? 'pit pit-in' : 'pit';
+              : pit.state === 'pit' ? 'pit pit-in'
+              : pit.state === 'setup' ? 'pit setup' : 'pit';
     setClass(el, cls);
     setText($('pitWhat'), pit.text || '');
     setText($('pitSub'), pit.sub || '');

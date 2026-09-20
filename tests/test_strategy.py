@@ -83,5 +83,30 @@ check('a restart resets the stops', e.stops_done == 0)
 
 check('no plan means no call', strategy.Engineer(None).call(5, False, 53) is None)
 
+# --- the strip is the only door to the settings, so it is always there -------------------------
+none = strategy.Engineer(None)
+check('with no plan at all it offers to make one',
+      none.screen(True, 'ks_monza', 20, 0, False) == {'state': 'setup', 'text': 'PLAN THIS RACE',
+                                                      'sub': 'TAP TO SET UP'})
+
+e = strategy.Engineer(PLAN)
+practice = e.screen(False, 'ks_silverstone|gp', 0, 0, False)
+check('in practice it shows the plan and invites an edit',
+      practice['state'] == 'setup' and '53 LAPS' in practice['text'] and 'EDIT' in practice['sub'], practice)
+
+wrong_laps = e.screen(True, 'ks_silverstone|gp', 20, 0, False)
+check('a race of another length says which', 'THIS RACE IS 20' in wrong_laps['sub'], wrong_laps)
+
+wrong_track = e.screen(True, 'ks_monza', 53, 0, False)
+check('another track says so too', 'ANOTHER TRACK' in wrong_track['sub'], wrong_track)
+
+live = e.screen(True, 'ks_silverstone|gp', 53, 6, False)
+check('the race it was made for gives the real call', live['state'] == 'box', live)
+
+check('the strip is never empty, whatever the session',
+      all(e.screen(race, track, laps, 0, False)
+          for race in (True, False) for track in ('', 'ks_monza', 'ks_silverstone|gp')
+          for laps in (0, 20, 53)))
+
 print('\nALL PASS' if not fails else f'\n{fails} FAILED')
 sys.exit(1 if fails else 0)

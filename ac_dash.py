@@ -521,13 +521,12 @@ def build_view(p, g, s, app, timing, shift, auto, now, engineer=None):
     charge = p.kersCharge
     view['ers'] = max(0.0, min(1.0, charge)) if math.isfinite(charge) and charge > 0 else None
 
-    # The pit call, when a plan is loaded and it is for this track and distance.
+    # The pit call during a planned race; otherwise a way into the strategy page.
     view['pit'] = None
-    if engineer is not None and g.session == AC_RACE:
+    if engineer is not None:
         track_id = app.track + ('|' + app.layout if app.layout else '')
-        if engineer.plan and engineer.plan.fits(track_id, g.numberOfLaps):
-            engineer.update(g.completedLaps, bool(g.isInPit))
-            view['pit'] = engineer.call(g.completedLaps, bool(g.isInPit), g.numberOfLaps)
+        view['pit'] = engineer.screen(g.session == AC_RACE, track_id, g.numberOfLaps,
+                                      g.completedLaps, bool(g.isInPit))
     return view
 
 

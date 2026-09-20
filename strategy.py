@@ -207,6 +207,33 @@ class Engineer:
             self.stops_done += 1
         self._in_pit = bool(in_pit)
 
+    def screen(self, in_race, track, race_laps, completed_laps, in_pit):
+        """
+        What the dashboard shows, in every session.
+
+        When the plan fits the race you are in, that is the live pit call. Otherwise it is a
+        way into the settings page - the strip is the only door to it, so it must never
+        disappear just because there is no plan yet.
+        """
+        plan = self.plan
+        if plan is None or not plan.stints:
+            return {'state': 'setup', 'text': 'PLAN THIS RACE', 'sub': 'TAP TO SET UP'}
+
+        if not in_race or not plan.fits(track, race_laps):
+            stops = len(plan.stops)
+            summary = ' · '.join(x for x in (f'{plan.laps} LAPS' if plan.laps else '',
+                                             (plan.track or '').upper()) if x)
+            reason = 'TAP TO EDIT'
+            if in_race and race_laps and plan.laps != race_laps:
+                reason = f'THIS RACE IS {race_laps} · TAP TO EDIT'
+            elif in_race and plan.track and track and plan.track.lower() not in track.lower():
+                reason = 'ANOTHER TRACK · TAP TO EDIT'
+            return {'state': 'setup', 'text': summary or 'PLAN READY',
+                    'sub': f'{stops} STOP{"S" if stops != 1 else ""} · {reason}' if stops else reason}
+
+        self.update(completed_laps, in_pit)
+        return self.call(completed_laps, in_pit, race_laps)
+
     def call(self, completed_laps, in_pit, race_laps=0):
         """
         What the dashboard should show right now, or None.
