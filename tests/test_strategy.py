@@ -38,9 +38,10 @@ def drive(engineer, laps, pit_on=()):
 
 # --- the plan itself ---------------------------------------------------------------------------
 check('reads the stop laps', PLAN.stops == [7, 24, 41], PLAN.stops)
-check('a plan for this race fits', PLAN.fits('ks_silverstone|gp', 53))
-check('another track does not fire', not PLAN.fits('ks_monza', 53))
-check('another distance does not fire', not PLAN.fits('ks_silverstone', 20))
+check('a plan with stints is usable', PLAN.usable())
+check('an empty plan is not', not strategy.Plan({'stints': []}).usable())
+check('stops past this race are dropped', PLAN.stops_within(20) == [7] and PLAN.stops_within(53) == [7, 24, 41])
+check('with no distance known, every stop counts', PLAN.stops_within(0) == [7, 24, 41])
 check('a missing file just means no plan', strategy.load('nope.json') is None)
 
 # --- the calls through a clean race -------------------------------------------------------------
@@ -91,17 +92,28 @@ check('with no plan at all it offers to make one',
 
 e = strategy.Engineer(PLAN)
 practice = e.screen(False, 'ks_silverstone|gp', 0, 0, False)
-check('in practice it shows the plan and invites an edit',
-      practice['state'] == 'setup' and '53 LAPS' in practice['text'] and 'EDIT' in practice['sub'], practice)
+check('in practice it lists the stop laps and invites an edit',
+      practice['state'] == 'setup' and practice['text'] == 'L7, L24, L41'
+      and '3 STOPS' in practice['sub'] and 'EDIT' in practice['sub'], practice)
 
-wrong_laps = e.screen(True, 'ks_silverstone|gp', 20, 0, False)
-check('a race of another length says which', 'THIS RACE IS 20' in wrong_laps['sub'], wrong_laps)
+e.reset()
+elsewhere = e.screen(True, 'ks_monza', 53, 6, False)
+check('a Silverstone plan calls you in at Monza too', elsewhere['state'] == 'box', elsewhere)
 
-wrong_track = e.screen(True, 'ks_monza', 53, 0, False)
-check('another track says so too', 'ANOTHER TRACK' in wrong_track['sub'], wrong_track)
+e.reset()
+shorter = e.screen(True, 'ks_monza', 20, 6, False)
+check('it works in a shorter race as well', shorter['state'] == 'box', shorter)
 
+e.reset()
+e.update(7, True)                       # you took the first stop
+e.update(8, False)
+past = e.screen(True, 'ks_monza', 20, 8, False)
+check('a stop the plan puts past this finish becomes a run to the flag',
+      past['text'] == 'NO MORE STOPS', past)
+
+e.reset()
 live = e.screen(True, 'ks_silverstone|gp', 53, 6, False)
-check('the race it was made for gives the real call', live['state'] == 'box', live)
+check('and still calls the race it was made for', live['state'] == 'box', live)
 
 check('the strip is never empty, whatever the session',
       all(e.screen(race, track, laps, 0, False)

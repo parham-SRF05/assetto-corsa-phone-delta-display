@@ -121,6 +121,7 @@
       <button type="button" id="lapsUp" aria-label="One lap more">+</button>
     </div>
   </div>
+  <button class="add" id="useRace" type="button" hidden></button>
 
   <h2>The plan</h2>
   <div class="bar" id="bar"></div>
@@ -353,12 +354,19 @@
       if (!plan.laps && data.raceLaps) plan.laps = data.raceLaps;
       plan.track = plan.track || data.track || '';
       const car = data.car ? data.car.replace(/_/g, ' ') : '';
+      if (data.raceLaps && data.raceLaps !== plan.laps) {
+        const btn = $('useRace');
+        btn.hidden = false;
+        btn.textContent = `Use this race's distance — ${data.raceLaps} laps`;
+        btn.onclick = () => { setLaps(data.raceLaps); btn.hidden = true; };
+      }
       const bits = [];
       if (car) bits.push(`<b>${car}</b>`);
       if (data.track) bits.push(data.track.replace('|', ' · '));
       if (data.raceLaps) bits.push(`${data.raceLaps} laps in the game`);
-      $('where').innerHTML = bits.length ? bits.join(' — ')
-        : 'Not in a session — the tyres below are a generic set until the game is running.';
+      $('where').innerHTML = (bits.length ? bits.join(' — ')
+        : 'Not in a session — the tyres below are a generic set until the game is running.')
+        + '<br>This plan runs at any track.';
       fixLaps();
       render();
     } catch (e) {

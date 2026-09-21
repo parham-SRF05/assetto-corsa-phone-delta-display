@@ -247,8 +247,12 @@ The page writes `strategy.json`, which you can also edit by hand:
 ```
 
 `boxOnLap` is the lap you come in at the end of; the last stint has `null` because it runs to the
-flag. A plan only fires when its `track` and `laps` match the race you are actually in, so an old
-plan can never call you into the pits at the wrong circuit.
+flag.
+
+**A plan works at any track.** The lap numbers are yours, so the same plan calls you in at Monza as
+readily as at Silverstone — `track` is only a note of where you wrote it. `laps` sets the countdown
+to the flag, and if the race you are in is shorter than the plan, any stop that would fall past the
+chequered flag is quietly dropped rather than called.
 
 ### Working out what the plan should be
 

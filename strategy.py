@@ -37,13 +37,19 @@ class Plan:
         """The laps you plan to come in on, in order."""
         return [s['box'] for s in self.stints if s['box']]
 
-    def fits(self, track, race_laps):
-        """A plan for another track or a different distance should not fire."""
-        if self.track and track and self.track.lower() not in track.lower():
-            return False
-        if self.laps and race_laps and abs(self.laps - race_laps) > 0:
-            return False
+    def usable(self):
+        """
+        A plan works anywhere.
+
+        It used to only fire at the track and distance it was written for, which meant a
+        Silverstone plan sat silent through a race at Monza. The laps you box on are the
+        only thing that matters, and those are yours to set.
+        """
         return bool(self.stints)
+
+    def stops_within(self, race_laps):
+        """The stops that actually land inside this race."""
+        return [lap for lap in self.stops if not race_laps or lap < race_laps]
 
 
 MAX_STINTS = 8
@@ -216,20 +222,15 @@ class Engineer:
         disappear just because there is no plan yet.
         """
         plan = self.plan
-        if plan is None or not plan.stints:
+        if plan is None or not plan.usable():
             return {'state': 'setup', 'text': 'PLAN THIS RACE', 'sub': 'TAP TO SET UP'}
 
-        if not in_race or not plan.fits(track, race_laps):
+        if not in_race:
             stops = len(plan.stops)
-            summary = ' · '.join(x for x in (f'{plan.laps} LAPS' if plan.laps else '',
-                                             (plan.track or '').upper()) if x)
-            reason = 'TAP TO EDIT'
-            if in_race and race_laps and plan.laps != race_laps:
-                reason = f'THIS RACE IS {race_laps} · TAP TO EDIT'
-            elif in_race and plan.track and track and plan.track.lower() not in track.lower():
-                reason = 'ANOTHER TRACK · TAP TO EDIT'
-            return {'state': 'setup', 'text': summary or 'PLAN READY',
-                    'sub': f'{stops} STOP{"S" if stops != 1 else ""} · {reason}' if stops else reason}
+            return {'state': 'setup',
+                    'text': ', '.join(f'L{lap}' for lap in plan.stops) if stops else 'NO STOPS',
+                    'sub': f'{stops} STOP{"S" if stops != 1 else ""} · TAP TO EDIT' if stops
+                           else 'TAP TO EDIT'}
 
         self.update(completed_laps, in_pit)
         return self.call(completed_laps, in_pit, race_laps)
@@ -254,11 +255,14 @@ class Engineer:
 
         # In the pit box the tyre you want is the one starting this stint, which the pit
         # entry already advanced us onto - not the one after it.
+        planned = self.plan.stops_within(race_laps)
         if in_pit and self.stops_done and stint['compound']:
             return {'state': 'pit', 'text': 'FIT ' + stint['compound'],
-                    'sub': f'STOP {self.stops_done} OF {len(self.plan.stops)}'}
+                    'sub': f'STOP {self.stops_done} OF {max(len(planned), self.stops_done)}'}
 
         box_lap = stint['box']
+        if race_laps and box_lap and box_lap >= race_laps:
+            box_lap = None      # a stop the plan puts past this race's finish: run to the flag
         if not box_lap:
             left = (race_laps - completed_laps) if race_laps else 0
             sub = f'{left} LAPS TO THE FLAG' if left > 0 else 'RUN TO THE FLAG'

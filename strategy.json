@@ -4,9 +4,17 @@
   "laps": 53,
   "warnLapsBefore": 1,
   "stints": [
-    { "compound": "SOFT", "boxOnLap": 7 },
-    { "compound": "HARD", "boxOnLap": 24 },
-    { "compound": "HARD", "boxOnLap": 41 },
-    { "compound": "MEDIUM", "boxOnLap": null }
+    {
+      "compound": "SOFT",
+      "boxOnLap": 10
+    },
+    {
+      "compound": "MEDIUM",
+      "boxOnLap": 26
+    },
+    {
+      "compound": "HARD",
+      "boxOnLap": null
+    }
   ]
-}
+}
